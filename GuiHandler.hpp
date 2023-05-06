@@ -16,6 +16,7 @@
 #include "VTCPOpcode.hpp"
 #include "VTCPClient.hpp"
 #include "ResultHandler.hpp"
+#include "ManualTestHandler.hpp"
 #include "ManualTestOpcode.hpp"
 
 using json = nlohmann::json;
@@ -114,12 +115,12 @@ public slots:
         }
 
         Message message;
-        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+
         message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_REGISTER_REQ));
         message.push(softphoneIndex);
         message.push(softphoneId);
         message.push(pbxIP);
-        _client.send(message);
+        _manualTestHandler.handleManualTest(message);
     }
 
     void onManualTestUnregisterButtonClicked(int softphoneIndex)
@@ -130,10 +131,10 @@ public slots:
         }
 
         Message message;
-        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+
         message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_UNREGISTER_REQ));
         message.push(softphoneIndex);
-        _client.send(message);
+        _manualTestHandler.handleManualTest(message);
     }
 
     void onManualTestCallButtonClicked(int softphoneIndex, const std::string& destUri)
@@ -144,11 +145,11 @@ public slots:
         }
 
         Message message;
-        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+
         message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_CALL_REQ));
         message.push(softphoneIndex);
         message.push(destUri);
-        _client.send(message);
+        _manualTestHandler.handleManualTest(message);
     }
 
     void onManualTestHangupButtonClicked(int softphoneIndex)
@@ -160,10 +161,10 @@ public slots:
         }
 
         Message message;
-        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+
         message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_HANGUP_REQ));
         message.push(softphoneIndex);
-        _client.send(message);
+        _manualTestHandler.handleManualTest(message);
     }
 
     void onManualTestAnswerButtonClicked(int softphoneIndex)
@@ -174,10 +175,10 @@ public slots:
         }
 
         Message message;
-        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+
         message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_ANSWER_REQ));
         message.push(softphoneIndex);
-        _client.send(message);
+        _manualTestHandler.handleManualTest(message);
     }
 
     void onManualTestDeclineButtonClicked(int softphoneIndex)
@@ -188,10 +189,10 @@ public slots:
         }
 
         Message message;
-        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+
         message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_DECLINE_REQ));
         message.push(softphoneIndex);
-        _client.send(message);
+        _manualTestHandler.handleManualTest(message);
     }
 
     void onRefreshHeadersButtonClicked() {
@@ -225,5 +226,6 @@ private:
     QSharedPointer<MainWindow> _mainWindow;
     VTCPClient _client;
     ResultHandler _resultHandler;
+    ManualTestHandler _manualTestHandler;
 
 };

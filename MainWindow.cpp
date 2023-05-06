@@ -12,7 +12,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    ui->comboBox = new CheckableComboBox(this);
+//    ui->comboBox = new CheckableComboBox(this);
 
     connect(ui->connect_frame_Connect_button, SIGNAL(clicked()), this, SLOT(connectButtonClicked()));
     connect(ui->connect_frame_disconnect_button, SIGNAL(clicked()), this,  SLOT(disconnectButtonClicked()));

@@ -12,7 +12,6 @@
 #include "VTCPOpcode.hpp"
 #include "Message.hpp"
 #include "MainWindow.hpp"
-#include "ManualTestResultHandler.hpp"
 
 using json = nlohmann::json;
 
@@ -78,7 +77,7 @@ private:
 
     void onVtcpManualTestResualt(const Message& result)
     {
-        _manualTestHandler.handleManualTest(result);
+
     }
 
     void onVtcpHistoryHeaderResualt(const Message& result)
@@ -119,7 +118,4 @@ private:
 
     std::unordered_map<VTCPOpcode, std::function<void(const Message &)>> _handlers;
     std::function<void(const Message &)> _send;
-//    std::function<void(const std::string &)> _printAutoTestLog;
-
-    ManualTestHandler _manualTestHandler;
 };

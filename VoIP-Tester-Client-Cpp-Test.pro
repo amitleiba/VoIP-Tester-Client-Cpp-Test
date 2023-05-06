@@ -17,13 +17,17 @@ HEADERS += \
     GuiHandler.hpp \
     LogPopupWindow.hpp \
     MainWindow.hpp \
+    ManualTestHandler.hpp \
     ManualTestOpcode.hpp \
-    ManualTestResultHandler.hpp \
     Message.hpp \
     NetworkHandler.hpp \
     PjManager.hpp \
     Receiver.hpp \
     ResultHandler.hpp \
+    SSPAccount.hpp \
+    SSPCall.hpp \
+    Softphone.hpp \
+    SoftphoneArguments.hpp \
     Transmitter.hpp \
     VTCPClient.hpp \
     VTCPManualStatus.hpp \
