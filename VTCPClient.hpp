@@ -52,7 +52,6 @@ public:
         _thread = std::thread([this](){
             _context.run();
         });
-//        onConnect(ec);
     }
 
     void onConnect(const boost::system::error_code& ec)
@@ -75,6 +74,11 @@ public:
         if (!(*_connected)) {
             return;
         }
+
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_DISCONNECT_REQ));
+        send(message);
+
         boost::system::error_code ec;
         _socket->close(ec);
         if(ec)
@@ -85,7 +89,6 @@ public:
 
     void send(const Message & message)
     {
-//        std::cout << message.getSize() << std::endl;
         _transmitter.write(message.getAsBytes());
     }
 

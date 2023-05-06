@@ -13,13 +13,20 @@ SOURCES += \
     MainWindow.cpp
 
 HEADERS += \
+    CheckableComboBox.hpp \
     GuiHandler.hpp \
+    LogPopupWindow.hpp \
     MainWindow.hpp \
+    ManualTestOpcode.hpp \
+    ManualTestResultHandler.hpp \
     Message.hpp \
     NetworkHandler.hpp \
+    PjManager.hpp \
     Receiver.hpp \
+    ResultHandler.hpp \
     Transmitter.hpp \
     VTCPClient.hpp \
+    VTCPManualStatus.hpp \
     VTCPOpcode.hpp
 
 FORMS += \

@@ -7,11 +7,18 @@
 
 #include <QApplication>
 #include <QObject>
+#include <QSharedPointer>
+
+#include <nlohmann/json.hpp>
 
 #include "MainWindow.hpp"
 #include "Message.hpp"
 #include "VTCPOpcode.hpp"
 #include "VTCPClient.hpp"
+#include "ResultHandler.hpp"
+#include "ManualTestOpcode.hpp"
+
+using json = nlohmann::json;
 
 class GuiHandler : public QObject
 {
@@ -19,14 +26,10 @@ public:
     GuiHandler(int argc, char *argv[]):
         _app(argc, argv),
         _connected(std::make_shared<std::atomic<bool>>(false)),
-        _client(_connected, std::bind(&GuiHandler::onMessageReceived, this, std::placeholders::_1))
+        _client(_connected, std::bind(&GuiHandler::onMessageReceived, this, std::placeholders::_1)),
+        _mainWindow(QSharedPointer<MainWindow>::create()),
+        _resultHandler(_mainWindow, std::bind(&VTCPClient::send, &_client, std::placeholders::_1))
     {
-        _handlers.emplace(VTCPOpcode::VTCP_CONNECT_RES, std::bind(&GuiHandler::onVtcpConnectResualt, this, std::placeholders::_1));
-        _handlers.emplace(VTCPOpcode::VTCP_DISCONNECT_RES, std::bind(&GuiHandler::onVtcpDisconnectResualt, this, std::placeholders::_1));
-        _handlers.emplace(VTCPOpcode::VTCP_AUTO_TEST_RES, std::bind(&GuiHandler::onVtcpAutoTestResualt, this, std::placeholders::_1));
-        _handlers.emplace(VTCPOpcode::VTCP_MANUAL_TEST_RES, std::bind(&GuiHandler::onVtcpManualTestResualt, this, std::placeholders::_1));
-        _handlers.emplace(VTCPOpcode::VTCP_HISTORY_HEADER_RES, std::bind(&GuiHandler::onVtcpHistoryHeaderResualt, this, std::placeholders::_1));
-        _handlers.emplace(VTCPOpcode::VTCP_HISTORY_LOG_RES, std::bind(&GuiHandler::onVtcpHistoryLogResualtResualt, this, std::placeholders::_1));
         initSignals();
     }
 
@@ -35,16 +38,28 @@ public:
 
     void runGui()
     {
-        _mainWindow.show();
+        _mainWindow->show();
         _app.exec();
     }
 private:
     void initSignals()
     {
         std::cout << "init Buttons" << std::endl;
-        QObject::connect(&_mainWindow, &MainWindow::connectButtonClickedSignal, this, &GuiHandler::onConnectButtonClicked);
-        QObject::connect(&_mainWindow, &MainWindow::disconnectButtonClickedSignal, this, &GuiHandler::onDisconnectButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::connectButtonClickedSignal, this, &GuiHandler::onConnectButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::disconnectButtonClickedSignal, this, &GuiHandler::onDisconnectButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::runAutoTestSignal, this, &GuiHandler::onAutoTestButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::refreshHIstoryHeadersSignal, this, &GuiHandler::onRefreshHeadersButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::historyListItemClickedSignal, this, &GuiHandler::onItemClickedInHistoryList);
+        QObject::connect(&(*_mainWindow), &MainWindow::manualTestRegisterSignal, this, &GuiHandler::onManualTestRegisterButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::manualTestUnregisterSignal, this, &GuiHandler::onManualTestUnregisterButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::manualTestCallSignal, this, &GuiHandler::onManualTestCallButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::manualTestHangupSignal, this, &GuiHandler::onManualTestHangupButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::manualTestAnswerSignal, this, &GuiHandler::onManualTestAnswerButtonClicked);
+        QObject::connect(&(*_mainWindow), &MainWindow::manualTestDeclineSignal, this, &GuiHandler::onManualTestDeclineButtonClicked);
     }
+
+signals:
+    void printAutoTestSignal(const std::string& data);
 
 public slots:
     void onConnectButtonClicked(const std::string& domain, const std::string& port)
@@ -56,12 +71,7 @@ public slots:
 
         try
         {
-//            client.connect(domain, std::stoi(port));
             _client.connect(domain, port);
-//            *_connected = true;
-//            Message message;
-//            message.push(static_cast<int>(VTCPOpcode::VTCP_CONNECT_REQ));
-//            _client.send(message);
         }
         catch (std::exception e)
         {
@@ -77,72 +87,143 @@ public slots:
 
         std::cout << "onDisconnectButtonClicked " << std::endl;
 
-        Message message;
-        message.push(static_cast<int>(VTCPOpcode::VTCP_DISCONNECT_REQ));
-        _client.send(message);
         _client.disconnect();
         *_connected = false;
     }
 
-    void onConnnect()
+    void onAutoTestButtonClicked(const std::string& ip, int amount)
     {
+        if(!*_connected)
+            return;
 
+        std::cout << "onAutoTestButtonClicked " << std::endl;
+
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_AUTO_TEST_REQ));
+        message.push(ip);
+        message.push(amount);
+
+        _client.send(message);
     }
 
-    void onMessageReceived(const Message& request)
+    void onManualTestRegisterButtonClicked(int softphoneIndex, int softphoneId, const std::string& pbxIP)
     {
-        handle(request);
-    }
-
-    void handle(const Message& result)
-    {
-        try
-        {
-            auto op = result.readInteger();
-            auto opcode = static_cast<VTCPOpcode>(op);
-            _handlers.at(opcode)(result);
+        std::cout << "onManualTestRegisterButtonClicked " << softphoneIndex << ", " << softphoneId << ", " << pbxIP << std::endl;
+        if(!(*_connected)) {
+            return;
         }
-        catch(const std::exception& e)
-        {
-            std::cerr << e.what() << std::endl;
+
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+        message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_REGISTER_REQ));
+        message.push(softphoneIndex);
+        message.push(softphoneId);
+        message.push(pbxIP);
+        _client.send(message);
+    }
+
+    void onManualTestUnregisterButtonClicked(int softphoneIndex)
+    {
+        std::cout << "onManualTestUnregisterButtonClicked " << softphoneIndex << std::endl;
+        if(!(*_connected)) {
+            return;
         }
+
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+        message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_UNREGISTER_REQ));
+        message.push(softphoneIndex);
+        _client.send(message);
     }
 
-    void onVtcpConnectResualt(const Message& result)
+    void onManualTestCallButtonClicked(int softphoneIndex, const std::string& destUri)
     {
-        std::cout << "onVtcpConnectResualt"  << std::endl;
+        std::cout << "onManualTestCallButtonClicked " << softphoneIndex << ", " << destUri << std::endl;
+        if(!(*_connected)) {
+            return;
+        }
+
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+        message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_CALL_REQ));
+        message.push(softphoneIndex);
+        message.push(destUri);
+        _client.send(message);
     }
 
-    void onVtcpDisconnectResualt(const Message& result)
+    void onManualTestHangupButtonClicked(int softphoneIndex)
+
     {
+        std::cout << "onManualTestHangupButtonClicked " << softphoneIndex << std::endl;
+        if(!(*_connected)) {
+            return;
+        }
 
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+        message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_HANGUP_REQ));
+        message.push(softphoneIndex);
+        _client.send(message);
     }
 
-    void onVtcpAutoTestResualt(const Message& result)
+    void onManualTestAnswerButtonClicked(int softphoneIndex)
     {
+        std::cout << "onManualTestAnswerButtonClicked " << softphoneIndex << std::endl;
+        if(!(*_connected)) {
+            return;
+        }
 
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+        message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_ANSWER_REQ));
+        message.push(softphoneIndex);
+        _client.send(message);
     }
 
-    void onVtcpManualTestResualt(const Message& result)
+    void onManualTestDeclineButtonClicked(int softphoneIndex)
     {
+        std::cout << "onManualTestAnswerButtonClicked " << softphoneIndex << std::endl;
+        if(!(*_connected)) {
+            return;
+        }
 
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_MANUAL_TEST_REQ));
+        message.push(static_cast<int>(ManualTestOpcode::MANUAL_TEST_DECLINE_REQ));
+        message.push(softphoneIndex);
+        _client.send(message);
     }
 
-    void onVtcpHistoryHeaderResualt(const Message& result)
-    {
-
+    void onRefreshHeadersButtonClicked() {
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_HISTORY_HEADER_REQ));
+        _client.send(message);
     }
 
-    void onVtcpHistoryLogResualtResualt(const Message& result)
-    {
+    void onItemClickedInHistoryList(const std::string& data) {
+        if(!(*(_connected)))
+        {
+            return;
+        }
 
+        Message message;
+        message.push(static_cast<int>(VTCPOpcode::VTCP_HISTORY_LOG_REQ));
+        json json_list = json::parse(data);
+        message.push(json_list["_id"].get<std::string>());
+        _client.send(message);
     }
+
 
 private:
+    void onMessageReceived(const Message& request)
+    {
+        _resultHandler.handle(request);
+    }
+
     std::shared_ptr<std::atomic<bool>> _connected;
     QApplication _app;
-    MainWindow _mainWindow;
+    QSharedPointer<MainWindow> _mainWindow;
     VTCPClient _client;
+    ResultHandler _resultHandler;
 
-    std::unordered_map<VTCPOpcode, std::function<void(const Message &)>> _handlers;
 };

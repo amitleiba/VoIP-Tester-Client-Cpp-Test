@@ -1,0 +1,4 @@
+ #ifndef PJMANAGER_HPP
+#define PJMANAGER_HPP
+
+#endif // PJMANAGER_HPP

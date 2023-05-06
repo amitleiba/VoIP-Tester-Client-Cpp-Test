@@ -2,6 +2,10 @@
 #define MAINWINDOW_HPP
 
 #include <QMainWindow>
+#include <QListWidgetItem>
+#include <QTextBrowser>
+
+#include "ui_mainwindow.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -15,6 +19,8 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    Ui::MainWindow *ui;
+
 private slots:
     void connectButtonClicked();
     void disconnectButtonClicked();
@@ -26,25 +32,27 @@ private slots:
     void manualTestAnswerButtonClicked();
     void manualTestDeclineButtonClicked();
     void refreshHIstoryHeadersButtonClicked();
-    void historyListItemClicked();
+    void historyListItemClicked(QListWidgetItem*);
+    void printLog(QTextBrowser *textBrowser, const std::string& data);
+    void openLogPopupWindow(const std::string& data);
 
 signals:
     void connectButtonClickedSignal(const std::string &, const std::string&);
     void disconnectButtonClickedSignal();
-    void runAutoTestSignal(const std::string& pbxIp, const std::string& amount);
-    void manualTestRegisterSignal(int index, const std::string& id, const std::string& pbxIp);
+    void runAutoTestSignal(const std::string& pbxIp, int amount);
+    void manualTestRegisterSignal(int index, int id, const std::string& pbxIp);
     void manualTestUnregisterSignal(int index);
     void manualTestCallSignal(int index, const std::string& dest);
     void manualTestHangupSignal(int index);
     void manualTestAnswerSignal(int index);
     void manualTestDeclineSignal(int index);
-//    void printLogSignal(QTextBrowser *textBrowser, const std::string& value);
+    void printLogSignal(QTextBrowser *textBrowser, const std::string& data);
     void historyListItemClickedSignal(const std::string& item);
-    void openPopupWindowSignal(const std::string& data);
+    void openLogPopupWindowSignal(const std::string& data);
     void refreshHIstoryHeadersSignal();
 
 
 private:
-    Ui::MainWindow *ui;
+
 };
 #endif // MAINWINDOW_HPP
