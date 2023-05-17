@@ -84,6 +84,12 @@ public:
     //     _call->answer(prm);
     // }
 
+    void unregisterAccount()
+    {
+//        hangup();
+        _account->setRegistration(false);
+    }
+
     void hangup()
     {
         if(isActive())
@@ -91,6 +97,7 @@ public:
             pj::CallOpParam opcode;
             opcode.statusCode = PJSIP_SC_DECLINE;
             _call->hangup(opcode);
+            _call = nullptr;
         }
     }
 

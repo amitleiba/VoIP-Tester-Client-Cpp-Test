@@ -29,7 +29,8 @@ public:
         _connected(std::make_shared<std::atomic<bool>>(false)),
         _client(_connected, std::bind(&GuiHandler::onMessageReceived, this, std::placeholders::_1)),
         _mainWindow(QSharedPointer<MainWindow>::create()),
-        _resultHandler(_mainWindow, std::bind(&VTCPClient::send, &_client, std::placeholders::_1))
+        _resultHandler(_mainWindow, std::bind(&VTCPClient::send, &_client, std::placeholders::_1)),
+        _manualTestHandler(_mainWindow)
     {
         initSignals();
     }
@@ -42,6 +43,7 @@ public:
         _mainWindow->show();
         _app.exec();
     }
+
 private:
     void initSignals()
     {

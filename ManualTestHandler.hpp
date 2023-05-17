@@ -6,6 +6,14 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <string>
+#include <sstream>
+
+#include <QSharedPointer>
+#include <QTextBrowser>
+#include <QString>
+
+#include <pjsua2.hpp>
 
 #include "Softphone.hpp"
 #include "SoftphoneArguments.hpp"
@@ -13,17 +21,19 @@
 #include "Message.hpp"
 #include "VTCPManualStatus.hpp"
 #include "PjManager.hpp"
+#include "MainWindow.hpp"
 
 class ManualTestHandler {
 public:
-    ManualTestHandler()
+    ManualTestHandler(QSharedPointer<MainWindow> mainWindow):
+        _mainWindow(std::move(mainWindow))
     {
         _manualTestHandlers.emplace(ManualTestOpcode::MANUAL_TEST_REGISTER_REQ, std::bind(&ManualTestHandler::manualTestRegister, this, std::placeholders::_1));
         _manualTestHandlers.emplace(ManualTestOpcode::MANUAL_TEST_UNREGISTER_REQ, std::bind(&ManualTestHandler::manualTestUnregister, this, std::placeholders::_1));
         _manualTestHandlers.emplace(ManualTestOpcode::MANUAL_TEST_CALL_REQ, std::bind(&ManualTestHandler::manualTestCall, this, std::placeholders::_1));
         _manualTestHandlers.emplace(ManualTestOpcode::MANUAL_TEST_HANGUP_REQ, std::bind(&ManualTestHandler::manualTestHangup, this, std::placeholders::_1));
         _manualTestHandlers.emplace(ManualTestOpcode::MANUAL_TEST_ANSWER_REQ, std::bind(&ManualTestHandler::manualTestAnswer, this, std::placeholders::_1));
-        _manualTestHandlers.emplace(ManualTestOpcode::MANUAL_TEST_DECLINE_REQ, std::bind(&ManualTestHandler::manualTestAnswer, this, std::placeholders::_1));
+        _manualTestHandlers.emplace(ManualTestOpcode::MANUAL_TEST_DECLINE_REQ, std::bind(&ManualTestHandler::manualTestDecline, this, std::placeholders::_1));
     }
 
     ~ManualTestHandler() = default;
@@ -49,13 +59,37 @@ private:
         auto id = request.readInteger();
         auto domain = request.readString();
 
-        if(!(index >= 0 && index <= 2) || _manualTestSoftphones[index])
+        QTextBrowser* textBrowser;
+
+
+
+        if(!(index >= 0 && index <= 2))
         {
-//            response.push(static_cast<int>(VTCP_MANUAL_STATUS::CLIENT_ERROR));
+            std::cout << "Manual test index error" << std::endl;
+            return;
         }
-        else if(id > 0 && id < 9999)
+        else if(index == 0)
         {
-//            response.push(static_cast<int>(VTCP_MANUAL_STATUS::CLIENT_ERROR));
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_1;
+        }
+        else if(index == 1)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_2;
+        }
+        else if(index == 2)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_3;
+        }
+        if(_manualTestSoftphones[index])
+        {
+            std::string errorMessage = "The softphone is already registered\n";
+            textBrowser->insertPlainText(QString::fromStdString(errorMessage));
+        }
+        if(id > 0 && id < 9999)
+        {
+            std::string errorMessage = "Invalid ID, the ID cant be between 0 to 9999\n";
+            textBrowser->insertPlainText(QString::fromStdString(errorMessage));
+            return;
         }
         else
         {
@@ -83,8 +117,9 @@ private:
         }
         else
         {
-            _manualTestSoftphones[index].reset();
-
+            _manualTestSoftphones[index]->unregisterAccount();
+            sleep(1);
+            _manualTestSoftphones[index] = nullptr;
 //            response.push(static_cast<int>(VTCP_MANUAL_STATUS::OK));
 //            response.push(index);
         }
@@ -180,18 +215,47 @@ private:
     void onCallState(const pj::OnCallStateParam &prm, const pj::CallInfo &ci, const int softphoneID)
     {
         std::shared_ptr<Softphone> softphone;
-        for(const auto &sp : _manualTestSoftphones)
+        int index = -1;
+        for(int i=0; i < _manualTestSoftphones.size(); i++)
         {
-            if(sp->getId() == softphoneID)
+            if(_manualTestSoftphones[i])
             {
-                softphone = sp;
-                break;
+                if(_manualTestSoftphones[i]->getId() == softphoneID)
+                {
+                    index = i;
+                    softphone = _manualTestSoftphones[i];
+                    break;
+                }
             }
+        }
+
+        QTextBrowser* textBrowser;
+
+        if(!(index >= 0 && index <= 2))
+        {
+            std::cout << "Manual test index error" << std::endl;
+            return;
+        }
+        else if(index == 0)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_1;
+        }
+        else if(index == 1)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_2;
+        }
+        else if(index == 2)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_3;
         }
 
         PJ_UNUSED_ARG(prm);
         std::cout << "*** Call: " <<  ci.remoteUri << " [" << ci.stateText
                   << "]" << std::endl;
+        std::stringstream message;
+        message << "*** Call: " <<  ci.remoteUri << " [" << ci.stateText
+                << "]" << std::endl;
+        textBrowser->insertPlainText(QString::fromStdString(message.str()));
         if (ci.state == PJSIP_INV_STATE_DISCONNECTED)
         {
             softphone->clearCall();
@@ -200,14 +264,91 @@ private:
 
     void onRegState(const pj::OnRegStateParam &prm, const pj::AccountInfo &ai, const int softphoneID)
     {
+        int index = -1;
+        for(int i=0; i < _manualTestSoftphones.size(); i++)
+        {
+            if(_manualTestSoftphones[i])
+            {
+                if(_manualTestSoftphones[i]->getId() == softphoneID)
+                {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        QTextBrowser* textBrowser;
+
+        if(!(index >= 0 && index <= 2))
+        {
+            std::cout << "Manual test index error" << std::endl;
+            return;
+        }
+        else if(index == 0)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_1;
+        }
+        else if(index == 1)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_2;
+        }
+        else if(index == 2)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_3;
+        }
         std::cout << (ai.regIsActive? "*** Register: code=" : "*** Unregister: code=")
                   << prm.code << std::endl;
-
+        std::stringstream message;
+        message << (ai.regIsActive? "*** Register: code=" : "*** Unregister: code=")
+                << prm.code << std::endl;
+        textBrowser->insertPlainText(QString::fromStdString(message.str()));
     }
 
     void onIncomingCall(std::shared_ptr<SSPCall> &mainCall, std::shared_ptr<SSPCall> incomingCall, const int softphoneID)
     {
-        std::cout << "onIncomingCall" << std::endl;
+        std::shared_ptr<Softphone> softphone;
+        int index = -1;
+        for(int i=0; i < _manualTestSoftphones.size(); i++)
+        {
+            if(_manualTestSoftphones[i])
+            {
+                if(_manualTestSoftphones[i]->getId() == softphoneID)
+                {
+                    index = i;
+                    softphone = _manualTestSoftphones[i];
+                    break;
+                }
+            }
+        }
+
+        QTextBrowser* textBrowser;
+
+        if(!(index >= 0 && index <= 2))
+        {
+            std::cout << "Manual test index error" << std::endl;
+            return;
+        }
+        else if(index == 0)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_1;
+        }
+        else if(index == 1)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_2;
+        }
+        else if(index == 2)
+        {
+            textBrowser = _mainWindow->ui->softphone_log_text_browser_3;
+        }
+
+        pj::CallInfo ci = incomingCall->getInfo();
+
+        std::cout << "*** Incoming Call: " <<  ci.remoteUri << " ["
+                  << ci.stateText << "]" << std::endl;
+        std::stringstream message;
+        message << "*** Incoming Call: " <<  ci.remoteUri << " ["
+                << ci.stateText << "]" << std::endl;
+        textBrowser->insertPlainText(QString::fromStdString(message.str()));
+
         if(mainCall && mainCall->isActive())
         {
             pj::CallOpParam opcode;
@@ -243,10 +384,9 @@ private:
             else if(softphone->getAnsweredIncomingCall())
             {
                 mainCall = std::move(incomingCall);
-                pj::CallInfo ci = mainCall->getInfo();
+
                 pj::CallOpParam prm;
-                std::cout << "*** Incoming Call: " <<  ci.remoteUri << " ["
-                          << ci.stateText << "]" << std::endl;
+
                 prm.statusCode = PJSIP_SC_OK;
                 mainCall->answer(prm);
             }
@@ -259,6 +399,7 @@ private:
     }
 
     PjManager _pjManager;
+    QSharedPointer<MainWindow> _mainWindow;
 
     std::unordered_map<ManualTestOpcode, std::function<void(const Message &)>> _manualTestHandlers;
     std::array<std::shared_ptr<Softphone>, 3> _manualTestSoftphones;
